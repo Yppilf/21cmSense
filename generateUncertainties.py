@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib.pyplot import figure,colorbar
 from astropy import units as un
 from py21cmsense import GaussianBeam, Observatory, Observation, PowerSpectrum, hera
+from py21cmsense.observatory import get_builtin_profiles, Observatory
 
 def generateSensitivityHera(freq, foreground="moderate", n_days=180, hpd=6):
     """
@@ -28,17 +29,34 @@ def generateSensitivityHera(freq, foreground="moderate", n_days=180, hpd=6):
 
     return sensitivity
 
+def generateSensitivityFromProfile(profile, freq, foreground="moderate", n_days=180, hpd=6):
+    """
+    Generate the sensitivity object for given observation
+
+    Parameters:
+    profile     - Profile of the observatory to use
+    freq        - The frequency at which we observe in MHz
+    foreground  - The approach to take for foreground excision. Default="moderate". Options = { "moderate", "optimistic" }
+    n_days      - Amount of days observed. Default = 180
+    hpd         - Hours per day of observation. Default = 6
+    """
+    obs = Observatory.from_profile(profile, frequency=75 * un.MHz)
+    sensitivity = PowerSpectrum(
+        observation = Observation(
+            observatory = obs,
+            time_per_day = hpd*un.hour,
+            n_days = n_days
+        ),
+        foreground_model = foreground,
+    )
+
+    return sensitivity
+
 def generateSensitivitySpectrum(sensitivity):
     power_std = sensitivity.calculate_sensitivity_1d()
     power_std_thermal = sensitivity.calculate_sensitivity_1d(thermal=True, sample=False)
     power_std_sample = sensitivity.calculate_sensitivity_1d(thermal=False, sample=True)
     return power_std, power_std_thermal, power_std_sample
-
-def documentation():
-    print(help(PowerSpectrum))
-    # print(help(Observation))
-    # print(help(Observatory))
-    # print(help(hera))
 
 def calc21ObsFreq(z):
     """Calculate the frequency at which we observe the 21cm signal for given redshift z"""
@@ -58,7 +76,7 @@ def displayObservatory(observatory, observatoryName):
     cbar.set_label("Number of baselines in group", fontsize=15)
     frame.set_title(f"Map of {observatoryName}")
     fig.tight_layout()
-    fig.savefig(f"Observatory_redundancy_{observatoryName}.png")
+    fig.savefig(f"Observatory_baseline_groups_{observatoryName}.png")
 
 
     fig = figure()
@@ -89,13 +107,14 @@ def plotSpectrum(sensitivity, observatoryName, z, n_days):
     fig.tight_layout()
     fig.savefig(f"sensitivitySpectrum_{observatoryName}.png")
 
-def main():
-    z = 16.1
-    n_days = 540
+def main(z=16.1, n_days=540, hpd=6):
     freq = calc21ObsFreq(z)
-    sensitivity_hera = generateSensitivityHera(freq=freq, n_days=n_days) 
-    displayObservatory(sensitivity_hera.observation.observatory, "HERA")
-    plotSpectrum(sensitivity_hera, "HERA", z, n_days)
+    # sensitivity_hera = generateSensitivityHera(freq=freq, n_days=n_days, hpd=hpd) 
+    sensitivity_hera = generateSensitivityFromProfile('HERA-H1C-IDR3', freq, n_days=n_days, hpd=hpd)
+    displayObservatory(sensitivity_hera.observation.observatory, "HERA2")
+    plotSpectrum(sensitivity_hera, "HERA2", z, n_days)
+
+def test():
+    print(get_builtin_profiles())
 
 main()
-# documentation()
